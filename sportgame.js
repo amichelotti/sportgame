@@ -1,14 +1,17 @@
 const http = require('http');
 const WebSocketServer = require('websocket').server;
+var giocatori=[];
 const server = http.createServer();
-server.listen(3001);
+const port=3001;
+server.listen(port);
 const wsServer = new WebSocketServer({
     httpServer: server
 });
-console.log("starting server on 3001");
+console.log("starting server on port:"+port);
+//console.log("aggiornato");
 var players={}; //players info
 var start_game_time_out=null;
-var update_stats_interval=2000;
+var update_stats_interval=20000;
 var game_starts_in=5000;
 var game_duration=120000;
 var time_elapsed=0;
@@ -21,16 +24,18 @@ function reset_game(){
 function listOfPlayers(){
     var l=[];
     for(var k in players){
-        l.push(k);
+        l.push(players[k].player);
     }
     return l;
 }
 function sendAll(d){
-    var list=listOfPlayers();
+
     console.log("sending ->"+JSON.stringify(d));
-    list.forEach(e=>{
-        e['connection'].sentUTF(JSON.stringify(d));
-    });
+    for(var k in players){
+    
+      players[k]['connection'].sendUTF(JSON.stringify(d));
+    
+    }
 }
 function playerScoreSort(){
     var list=[];
@@ -42,8 +47,10 @@ function playerScoreSort(){
     return list;
 }
 wsServer.on('request', function(request) {
-    const connection = request.accept(null, request.origin);
+    var connection = request.accept(null, request.origin);
+    let uid = (Math.random() + 1).toString(36).substring(7);
     console.log("someone connected");
+    connection['uid']=uid;
     connection.on('message', function(message) {
       console.log('Received Message:', message.utf8Data);
       try{
@@ -53,8 +60,8 @@ wsServer.on('request', function(request) {
             if(data['cmd']=="request_to_join"){
                 if(!players.hasOwnProperty(data['device'])){
                     // not exitst, add an entry with connection, player name and join time
-                    players[data['device']]={
-                        connection:connection,
+		    players[data['device']]={
+		        connection:connection,
                         player:data['player'],
                         score:0,// initial score
                         ts:new Date()
@@ -129,7 +136,7 @@ wsServer.on('request', function(request) {
         console.log('Client has disconnected.');
 
         for(var k in players){
-            if(players[k].connection.remoteAddress==connection.remoteAddress){
+            if(players[k].connection.uid==connection.uid){
                 console.log(players[k].player+' left the game');
                 delete players[k];
             }
