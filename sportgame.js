@@ -94,7 +94,7 @@ wsServer.on('request', function(request) {
                         var d={
                             cmd:"start",
 			    result:playerScoreSort(),
-                            game_end:game_duration/1000
+                            time_end:game_duration/1000
                         }
                         sendAll(d);
                         var upd_int=setInterval(()=>{
