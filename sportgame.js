@@ -12,13 +12,15 @@ console.log("starting server on port:"+port);
 var players={}; //players info
 var start_game_time_out=null;
 var update_stats_interval=20000;
-var game_starts_in=5000;
+var game_starts_in=10000;
 var game_duration=120000;
 var time_elapsed=0;
-
+var player_id=0;
+var msg_id=0;
 function reset_game(){
     players={}; //players info
     time_elapsed=0;
+    player_id=0;
       
 }
 function listOfPlayers(){
@@ -29,7 +31,7 @@ function listOfPlayers(){
     return l;
 }
 function sendAll(d){
-
+    d['msgid']=msg_id++;
     console.log("sending ->"+JSON.stringify(d));
     for(var k in players){
     
@@ -41,7 +43,7 @@ function playerScoreSort(){
     var list=[];
     for(var k in players){
         //make a list of {playersname,score}
-        list.push({player:players[k].player,score:players[k].score});
+        list.push({player:players[k].player,score:players[k].score,id:players[k].id});
     }
     list.sort((a,b) =>{return b['score']-a['score'];} )
     return list;
@@ -60,20 +62,26 @@ wsServer.on('request', function(request) {
             if(data['cmd']=="request_to_join"){
                 if(!players.hasOwnProperty(data['device'])){
                     // not exitst, add an entry with connection, player name and join time
+		    player_id++;
 		    players[data['device']]={
 		        connection:connection,
                         player:data['player'],
                         score:0,// initial score
-                        ts:new Date()
+                        ts:new Date(),
+			id:player_id
+			
                     };
+		    
                     console.log("added:"+data['player']);
                     
                     var d={
                         cmd:"player_list_update",
                         player_list:listOfPlayers(),
                         new_player:data['player'],
-                        game_countdown:game_starts_in
-
+			id:player_id,
+			device:data['device'],
+                        game_countdown:game_starts_in/1000
+			
                     }
                     sendAll(d); // communicate all the new list
                     if(start_game_time_out!=null){
@@ -85,7 +93,8 @@ wsServer.on('request', function(request) {
                         // send command start game to all
                         var d={
                             cmd:"start",
-                            game_end:game_duration
+			    result:playerScoreSort(),
+                            game_end:game_duration/1000
                         }
                         sendAll(d);
                         var upd_int=setInterval(()=>{
@@ -93,7 +102,7 @@ wsServer.on('request', function(request) {
                             var d={
                                 cmd:"stats",
                                 result:playerScoreSort(),
-                                time_end:(game_duration-time_elapsed) // tempo rimanente
+                                time_end:(game_duration-time_elapsed)/1000 // tempo rimanente
                             }
                             sendAll(d);
                             //
@@ -124,6 +133,12 @@ wsServer.on('request', function(request) {
                 }
                 connection.sendUTF(JSON.stringify(d)); // return the list of current players
 
+            } else if(data['cmd']=="update_score"){
+		if(players.hasOwnProperty(data['device'])){
+		    players[data['device']]['score']=data['score'];
+		    console.log("updated:"+JSON.stringify(data['device']));
+		}
+
             }
 
         }
@@ -143,3 +158,4 @@ wsServer.on('request', function(request) {
         }
     });
 });
+
